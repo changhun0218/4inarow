@@ -17,9 +17,14 @@ class MCTS:
         Q(s, a) : a mean action value
         """
     def select(self):
+        """
+        a move for Monte Carlo simulation will be determined that maximizes Q + U
+        """
 
     def expand(self):
+        
 
+        
     def eval(self):
         
     def backup(self):
