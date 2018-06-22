@@ -15,7 +15,69 @@ def softmax(x):
     probs /= np.sum(probs)
     return probs
 
+class Board():
+    whose_turn = 1
+    vectors = np.array([[1, 0], [1, 1], [0, 1], [1, -1]])
 
+    def __init__(self):
+        self.board = np.zeros((7, 9,))
+        self.last_move = [None, None]
+
+    def board_setting(self):
+        pass
+    
+    def board_update(self, i):
+        num_non_zero = np.count_nonzero(self.board[:, i + 1])
+        x, y = 5 - num_non_zero, i + 1
+        self.last_move = np.array([x, y])
+        if num_non_zero == 6: # over
+            return
+
+        self.board[x, y] = self.whose_turn
+
+        end, winner = self.game_end()
+        if end:
+            return
+        
+        self.whose_turn *= -1
+
+
+    def game_end(self):
+        pos = self.last_move
+        if pos[0] == None:
+            return False, False
+
+        for vector in self.vectors:
+            count = 0
+            for sign in [-1, 1]:
+                temp = np.copy(pos)
+                while count < 10:
+                    temp += vector * sign
+                    #print(sign, temp)
+                    if self.board[temp[0], temp[1]] == self.whose_turn:
+                        count += 1
+                    else :
+                        break
+            if count >= 3:
+                print(self.board)
+                print("Winner is :", self.whose_turn)
+                return True, self.whose_turn
+        return False, False
+    
+    def make_a_move(self, action):
+        print(self.board)
+        self.board_update(action)
+
+    def get_board(self):
+        return self.board
+    
+    def get_current_player(self):
+        return self.whose_turn
+    
+    def get_move(self):
+        pass
+
+    
 class TreeNode(object):
     """A node in the MCTS tree.
 
@@ -36,6 +98,7 @@ class TreeNode(object):
         action_priors: a list of tuples of actions and their prior probability
             according to the policy function.
         """
+        action_priors = zip(np.arange(7), action_priors)
         for action, prob in action_priors:
             if action not in self._children:
                 self._children[action] = TreeNode(self, prob)
@@ -99,10 +162,16 @@ class MCTS(object):
             relying on the prior more.
         """
         self._root = TreeNode(None, 1.0)
-        self._policy = policy_value_fn
+        #self._policy = policy_value_fn
         self._c_puct = c_puct
         self._n_playout = n_playout
 
+    def _policy(self, state):
+        v = np.random.rand()
+        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+        return p, v
+                    
+        
     def _playout(self, state):
         """Run a single playout from the root to the leaf, getting a value at
         the leaf and propagating it back through its parents.
@@ -114,16 +183,16 @@ class MCTS(object):
                 break
             # Greedily select next move.
             action, node = node.select(self._c_puct)
-            state.do_move(action)
-
+            state.make_a_move(action)
+        end, winner = state.game_end()
+            
         # Evaluate the leaf using a network which outputs a list of
         # (action, probability) tuples p and also a score v in [-1, 1]
         # for the current player.
         action_probs, leaf_value = self._policy(state)
-        # Check for end of game.
-        end, winner = state.game_end()
         if not end:
             node.expand(action_probs)
+
         else:
             # for end state，return the "true" leaf_value
             if winner == -1:  # tie
@@ -155,7 +224,8 @@ class MCTS(object):
         return acts, act_probs
 
     def update_with_move(self, last_move):
-        """Step forward in the tree, keeping everything we already know
+        """
+        Step forward in the tree, keeping everything we already know
         about the subtree.
         """
         if last_move in self._root._children:
@@ -168,10 +238,12 @@ class MCTS(object):
         return "MCTS"
 
 
+    
+
 class MCTSPlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, policy_value_function,
+    def __init__(self, policy_value_function=None,
                  c_puct=5, n_playout=2000, is_selfplay=0):
         self.mcts = MCTS(policy_value_function, c_puct, n_playout)
         self._is_selfplay = is_selfplay
@@ -183,12 +255,13 @@ class MCTSPlayer(object):
         self.mcts.update_with_move(-1)
 
     def get_action(self, board, temp=1e-3, return_prob=0):
-        sensible_moves = board.availables
+        #sensible_moves = board.availables
+        sensible_moves = np.arange(7)
         # the pi vector returned by MCTS as in the alphaGo Zero paper
-        move_probs = np.zeros(board.width*board.height)
+        move_probs = np.zeros((7))
         if len(sensible_moves) > 0:
-            acts, probs = self.mcts.get_move_probs(board, temp)
-            move_probs[list(acts)] = probs
+            acts, probs = self.mcts.get_move_probs(board, temp) # a, p_a 
+            move_probs[list(acts)] = probs # p(a)
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
@@ -216,3 +289,9 @@ class MCTSPlayer(object):
 
     def __str__(self):
         return "MCTS {}".format(self.player)
+
+if __name__=="__main__":
+    play = MCTSPlayer(is_selfplay=True)
+
+    board = Board()
+    play.get_action(board)

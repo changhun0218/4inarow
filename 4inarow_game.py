@@ -11,7 +11,7 @@ class game:
         x, y = 5 - num_non_zero, i + 1
         if num_non_zero == 6: # over
             return
-
+        
         self.board[x, y] = self.whose_turn
 
         for vector in self.vectors:
