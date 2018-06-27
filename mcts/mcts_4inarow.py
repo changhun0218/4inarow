@@ -56,12 +56,15 @@ class Board():
                     else :
                         break
             if count >= 3:
-                print(self.board)
+                #print(self.board)
                 #print("available:", self.availables)
                 self.winner = self.whose_turn
-                print("Winner is :", self.whose_turn)
-                return True, self.whose_turn
-        return False, False
+                ##print("Winner is :", self.whose_turn)
+                return True, self.winner
+            elif len(self.availables) == 0:
+                self.winner = 0
+                return True, self.winner
+        return False, None
     
     def make_a_move(self, action):
         self.whose_turn *= -1
@@ -265,7 +268,6 @@ class MCTSPlayer(object):
             acts, probs = self.mcts.get_move_probs(board, temp) # a, p_a
             move_probs[list(acts)] = probs # p(a)
             self.res.append([board.get_board(), move_probs]) # list of results (s, p) for learning
-            print(move_probs)
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
@@ -288,6 +290,7 @@ class MCTSPlayer(object):
             else:
                 return move
         else:
+            return None
             print("WARNING: the board is full")
 
     def __str__(self):
@@ -295,8 +298,13 @@ class MCTSPlayer(object):
 
 if __name__=="__main__":
     a = time.time()
-    for _ in range(20):
-        play = MCTSPlayer(is_selfplay=True)
-        board = Board()
-        play.get_action(board)
+    play = MCTSPlayer(is_selfplay=True)
+    board = Board()
+    while True:
+        move = play.get_action(board)
+        print(play.res[-1])
+        print("winner:", board.game_end()[1])
+        if board.game_end()[0] == True:
+            break
+
     print(time.time() - a)
