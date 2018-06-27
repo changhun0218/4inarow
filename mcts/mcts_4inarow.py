@@ -8,7 +8,7 @@ network to guide the tree search and evaluate the leaf nodes
 
 import numpy as np
 import copy
-
+import time
 
 def softmax(x):
     probs = np.exp(x - np.max(x))
@@ -22,6 +22,8 @@ class Board():
     def __init__(self):
         self.board = np.zeros((7, 9,))
         self.last_move = [None, None]
+        self.winner = 0
+        self.availables = np.arange(7)
 
     def board_setting(self):
         pass
@@ -34,7 +36,7 @@ class Board():
             return
 
         self.board[x, y] = self.whose_turn
-
+        self.availables = np.where(self.board[1][1:8] == 0)
 
     def game_end(self):
         pos = self.last_move
@@ -46,7 +48,7 @@ class Board():
             count = 0
             for sign in [-1, 1]:
                 temp = np.copy(pos)
-                while count < 10:
+                while count < 4:
                     temp += vector * sign
                     #print(sign, temp)
                     if self.board[temp[0], temp[1]] == self.whose_turn:
@@ -54,8 +56,10 @@ class Board():
                     else :
                         break
             if count >= 3:
-                #print(self.board)
-                #print("Winner is :", self.whose_turn)
+                print(self.board)
+                #print("available:", self.availables)
+                self.winner = self.whose_turn
+                print("Winner is :", self.whose_turn)
                 return True, self.whose_turn
         return False, False
     
@@ -244,6 +248,7 @@ class MCTSPlayer(object):
                  c_puct=5, n_playout=2000, is_selfplay=0):
         self.mcts = MCTS(policy_value_function, c_puct, n_playout)
         self._is_selfplay = is_selfplay
+        self.res = []
 
     def set_player_ind(self, p):
         self.player = p
@@ -251,14 +256,16 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, board, temp=1e-3, return_prob=0):
-        #sensible_moves = board.availables
-        sensible_moves = np.arange(7)
+    def get_action(self, board, temp=1.0, return_prob=0):
+        sensible_moves = board.availables
+        #sensible_moves = np.arange(7)
         # the pi vector returned by MCTS as in the alphaGo Zero paper
         move_probs = np.zeros((7))
         if len(sensible_moves) > 0:
-            acts, probs = self.mcts.get_move_probs(board, temp) # a, p_a 
+            acts, probs = self.mcts.get_move_probs(board, temp) # a, p_a
             move_probs[list(acts)] = probs # p(a)
+            self.res.append([board.get_board(), move_probs]) # list of results (s, p) for learning
+            print(move_probs)
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
@@ -268,7 +275,6 @@ class MCTSPlayer(object):
                 )
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move, board)
-                #print(board.get_board())
             else:
                 # with the default temp=1e-3, it is almost equivalent
                 # to choosing the move with the highest prob
@@ -277,7 +283,6 @@ class MCTSPlayer(object):
                 self.mcts.update_with_move(-1)
                 #                location = board.move_to_location(move)
                 #                print("AI move: %d,%d\n" % (location[0], location[1]))
-
             if return_prob:
                 return move, move_probs
             else:
@@ -289,8 +294,9 @@ class MCTSPlayer(object):
         return "MCTS {}".format(self.player)
 
 if __name__=="__main__":
-    play = MCTSPlayer(is_selfplay=True)
-
-    board = Board()
+    a = time.time()
     for _ in range(20):
+        play = MCTSPlayer(is_selfplay=True)
+        board = Board()
         play.get_action(board)
+    print(time.time() - a)
