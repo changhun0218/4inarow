@@ -22,7 +22,7 @@ class Board():
     def __init__(self):
         self.board = np.zeros((7, 9,))
         self.last_move = [None, None]
-        self.winner = 0
+        self.winner = None
         self.availables = np.arange(7)
 
     def board_setting(self):
@@ -36,12 +36,16 @@ class Board():
             return
 
         self.board[x, y] = self.whose_turn
-        self.availables = np.where(self.board[1][1:8] == 0)
+        self.availables = np.where(self.board[0][1:8] == 0)
 
     def game_end(self):
         pos = self.last_move
         if pos[0] == None:
             return False, False
+
+        if len(self.availables) == 0:
+            self.winner = 0
+            return True, self.winner
 
         for vector in self.vectors:
             pos = self.last_move
@@ -61,9 +65,6 @@ class Board():
                 self.winner = self.whose_turn
                 ##print("Winner is :", self.whose_turn)
                 return True, self.winner
-            elif len(self.availables) == 0:
-                self.winner = 0
-                return True, self.winner
         return False, None
     
     def make_a_move(self, action):
@@ -73,6 +74,9 @@ class Board():
 
     def get_board(self):
         return self.board
+
+    def get_actual_board(self):
+        return self.board[:-1, 1:-1]
     
     def get_current_player(self):
         return self.whose_turn
@@ -251,7 +255,8 @@ class MCTSPlayer(object):
                  c_puct=5, n_playout=2000, is_selfplay=0):
         self.mcts = MCTS(policy_value_function, c_puct, n_playout)
         self._is_selfplay = is_selfplay
-        self.res = []
+        self.res_board = []
+        self.res_probs = []
 
     def set_player_ind(self, p):
         self.player = p
@@ -266,16 +271,18 @@ class MCTSPlayer(object):
         move_probs = np.zeros((7))
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(board, temp) # a, p_a
+            # to choose only available moves
+            array_available = np.zeros((7))
+            array_available[sensible_moves] = 1
+            probs = probs * array_available
+            probs /= np.sum(probs)
             move_probs[list(acts)] = probs # p(a)
-            self.res.append([board.get_board(), move_probs]) # list of results (s, p) for learning
+            
+            self.res_board.append(board.get_actual_board()) # store boards for learning
+            self.res_probs.append(move_probs) # store probability vectors for learning
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
-                # to choose only available moves
-                array_available = np.zeros((7))
-                array_available[sensible_moves] = 1
-                probs = probs * array_available
-                probs /= np.sum(probs)
                 move = np.random.choice(
                     acts,
                     p=0.75*probs + 0.25*np.random.dirichlet(0.3*np.ones(len(probs)))
@@ -307,9 +314,14 @@ if __name__=="__main__":
     board = Board()
     while True:
         move = play.get_action(board)
-        print(play.res[-1])
+        print(play.res_board[-1])
+        print(play.res_probs[-1])
         print("winner:", board.game_end()[1])
-        if board.game_end()[0] == True:
+        end, winner = board.game_end()
+        if end:
+            winner_arr = np.ones((len(play.res_board))) * winner
+            print(winner_arr)
             break
+        
 
     print(time.time() - a)

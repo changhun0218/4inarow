@@ -1,0 +1,17 @@
+import numpy as np
+import tensorflow as tf
+from mcts_4inarow import *
+
+if __name__ == "__main__":
+    play = MCTSPlayer(is_selfplay=True)
+    board = Board()
+    while True:
+        move = play.get_action(board)
+        print(play.res_board[-1])
+        print(play.res_probs[-1])
+        print("winner:", board.game_end()[1])
+        end, winner = board.game_end()
+        if end:
+            winner_arr = np.ones((len(play.res_board))) * winner
+            print(winner_arr)
+            break
