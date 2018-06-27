@@ -271,6 +271,11 @@ class MCTSPlayer(object):
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
+                # to choose only available moves
+                array_available = np.zeros((7))
+                array_available[sensible_moves] = 1
+                probs = probs * array_available
+                probs /= np.sum(probs)
                 move = np.random.choice(
                     acts,
                     p=0.75*probs + 0.25*np.random.dirichlet(0.3*np.ones(len(probs)))
