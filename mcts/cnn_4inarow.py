@@ -20,4 +20,14 @@ if __name__ == "__main__":
         # this is just an example
         tf_x = tf.placeholder(tf.float32, [None, 6 * 7]) 
         image = tf.reshape(tf_x, [-1, 6, 7, 1])  # (batch, height, width, channel)
-        tf_y = tf.placeholder(tf.int32, [None, 2]
+        cov1 = tf.nn.conv2d(input = tf_x,
+                           filter = 3,
+                           strides = [1, 1, 1, 1],
+                           padding = "SAME")
+        pool1 = tf.nn.max_pool(input = cov1,
+                               ksize = [],
+                               strides = [1, 1, 1, 1],
+                               padding = "SAME")
+        
+        tf_y = tf.placeholder(tf.float32, [None, 8])
+        loss = tf.reduce_mean(tf.nn.
