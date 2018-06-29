@@ -16,6 +16,9 @@ def softmax(x):
     return probs
 
 class Board():
+    """ Board of a four in row
+    This makes a move on a board and check if it ends"""
+    
     whose_turn = -1
     vectors = np.array([[1, 0], [1, 1], [0, 1], [1, -1]])
 
@@ -36,7 +39,7 @@ class Board():
             return
 
         self.board[x, y] = self.whose_turn
-        self.availables = np.where(self.board[0][1:8] == 0)
+        self.availables = np.where(self.board[0][1:8] == 0)  # indicators which shows the available move. 
 
     def game_end(self):
         pos = self.last_move
@@ -54,7 +57,6 @@ class Board():
                 temp = np.copy(pos)
                 while count < 4:
                     temp += vector * sign
-                    #print(sign, temp)
                     if self.board[temp[0], temp[1]] == self.whose_turn:
                         count += 1
                     else :
@@ -69,7 +71,6 @@ class Board():
     
     def make_a_move(self, action):
         self.whose_turn *= -1
-        #print(self.board)
         self.board_update(action)
 
     def get_board(self):
@@ -309,19 +310,42 @@ class MCTSPlayer(object):
         return "MCTS {}".format(self.player)
 
 if __name__=="__main__":
-    a = time.time()
+    start_time = time.time()
     play = MCTSPlayer(is_selfplay=True)
     board = Board()
-    while True:
+    input_ = np.zeros((6,7,)) # input for DNN
+    output_ = np.array([]) # answer for DNN
+    z_temp = 1
+    for i in range(43):
         move = play.get_action(board)
-        print(play.res_board[-1])
-        print(play.res_probs[-1])
-        print("winner:", board.game_end()[1])
         end, winner = board.game_end()
-        if end:
-            winner_arr = np.ones((len(play.res_board))) * winner
-            print(winner_arr)
+        pi = np.append(play.res_probs[-1], z_temp) # pi, v: pi which is prob of a
+        output_ = np.append(output_,pi)
+        # print("who's turn:",z_temp)
+        if end or (i==42 ):
+            #print("winner:", board.game_end()[1])
+            #winner_arr = np.ones((len(play.res_board))) * winner
+            #print(winner_arr)
+            print("who wins?:", z_temp)
             break
-        
 
-    print(time.time() - a)
+        s = np.array(play.res_board[-1]) # state
+        input_ = np.c_[input_, s] 
+        #print(s)
+        #print(pi)
+        z_temp *= -1
+
+    input_ = input_.reshape(6,-1,7)
+    output_ = output_.reshape(-1,8)
+    if z_temp == -1:    # if -1 wins, revert the 'v'
+        output_[:,7] *= -1
+    else:
+        pass
+    
+    #print("input:",input_.shape)
+    print("output:",output_)
+ 
+    np.save("input",input_)  # input[:,# of move,:]
+    np.save("output", output_) # output[# of move, :]
+    end_time = time.time()    
+    print(end_time - start_time)
