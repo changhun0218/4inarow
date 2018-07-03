@@ -309,20 +309,21 @@ class MCTSPlayer(object):
     def __str__(self):
         return "MCTS {}".format(self.player)
 
-if __name__=="__main__":
-    start_time = time.time()
-    play = MCTSPlayer(is_selfplay=True)
+def game_game(input_, output_):
     board = Board()
-    input_ = np.zeros((6,7,)) # input for DNN
-    output_ = np.array([]) # answer for DNN
+    play = MCTSPlayer(is_selfplay=True)
     z_temp = 1
+    input_ = np.append(input_, np.zeros((42,)))
+    output_t = np.array([])
+    
     for i in range(43):
         move = play.get_action(board)
         end, winner = board.game_end()
-        pi = np.append(play.res_probs[-1], z_temp) # pi, v: pi which is prob of a
-        output_ = np.append(output_,pi)
+        piv = np.append(play.res_probs[-1], z_temp) # pi, v: pi which is prob of a
+        output_t = np.append(output_t, piv)
+        
         # print("who's turn:",z_temp)
-        if end or (i==42 ):
+        if end or (i==42):
             #print("winner:", board.game_end()[1])
             #winner_arr = np.ones((len(play.res_board))) * winner
             #print(winner_arr)
@@ -330,20 +331,30 @@ if __name__=="__main__":
             break
 
         s = np.array(play.res_board[-1]) # state
-        input_ = np.c_[input_, s] 
+        input_ = np.append(input_, s) 
+
         #print(s)
         #print(pi)
         z_temp *= -1
-
-    input_ = input_.reshape(6,-1,7)
-    output_ = output_.reshape(-1,8)
+    output_t = output_t.reshape(-1,8)
     if z_temp == -1:    # if -1 wins, revert the 'v'
-        output_[:,7] *= -1
+        output_t[:,7] *= -1
     else:
         pass
+    output_ = np.append(output_, output_t)
+    return z_temp, input_, output_ 
+    
+if __name__=="__main__":
+    start_time = time.time()
+    input_ = np.array([]) # input for DNN
+    output_ = np.array([]) # answer for DNN
+    for _ in range(5):
+        z_temp, input_, output_= game_game(input_, output_)
+    input_ = input_.reshape(-1,42)
+    output_ = output_.reshape(-1,8)
     
     #print("input:",input_.shape)
-    print("output:",output_)
+    #print("output:",output_)
  
     np.save("input",input_)  # input[:,# of move,:]
     np.save("output", output_) # output[# of move, :]
