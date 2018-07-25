@@ -160,7 +160,7 @@ class TreeNode(object):
 class MCTS(object):
     """An implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, sess, c_puct=5, n_playout=1000):
+    def __init__(self, sess, c_puct=5, n_playout=2000):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -176,8 +176,9 @@ class MCTS(object):
         self._n_playout = n_playout
 
     def _policy(self, state):
-        p = sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
-        v = sess.run(tf_v, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)})
+        pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
+        p = pred[:7]
+        v = pred[7]
 #        v = np.random.rand()
 #        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return p, v
@@ -255,7 +256,7 @@ class MCTS(object):
 class MCTSPlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, sess, c_puct=5, n_playout=2000, is_selfplay=0):
+    def __init__(self, sess, c_puct=5, n_playout=1000, is_selfplay=0):
         self.mcts = MCTS(sess, c_puct, n_playout)
         self._is_selfplay = is_selfplay
         self.res_board = []
