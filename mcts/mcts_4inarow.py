@@ -9,6 +9,7 @@ network to guide the tree search and evaluate the leaf nodes
 import numpy as np
 import copy
 import time
+import tensorflow as tf
 
 def softmax(x):
     probs = np.exp(x - np.max(x))
@@ -65,7 +66,7 @@ class Board():
                 #print(self.board)
                 #print("available:", self.availables)
                 self.winner = self.whose_turn
-                ##print("Winner is :", self.whose_turn)
+                #print("Winner is :", self.whose_turn)
                 return True, self.winner
         return False, None
     
@@ -159,7 +160,7 @@ class TreeNode(object):
 class MCTS(object):
     """An implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, policy_value_fn, c_puct=5, n_playout=1000):
+    def __init__(self, sess, c_puct=5, n_playout=1000):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -175,8 +176,10 @@ class MCTS(object):
         self._n_playout = n_playout
 
     def _policy(self, state):
-        v = np.random.rand()
-        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+        p = sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
+        v = sess.run(tf_v, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)})
+#        v = np.random.rand()
+#        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return p, v
                     
         
@@ -252,9 +255,8 @@ class MCTS(object):
 class MCTSPlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, policy_value_function=None,
-                 c_puct=5, n_playout=2000, is_selfplay=0):
-        self.mcts = MCTS(policy_value_function, c_puct, n_playout)
+    def __init__(self, sess, c_puct=5, n_playout=2000, is_selfplay=0):
+        self.mcts = MCTS(sess, c_puct, n_playout)
         self._is_selfplay = is_selfplay
         self.res_board = []
         self.res_probs = []
@@ -290,6 +292,7 @@ class MCTSPlayer(object):
                 )
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move, board)
+                print(board.get_actual_board())
             else:
                 # with the default temp=1e-3, it is almost equivalent
                 # to choosing the move with the highest prob
@@ -309,9 +312,9 @@ class MCTSPlayer(object):
     def __str__(self):
         return "MCTS {}".format(self.player)
 
-def game_game(input_, output_):
+def game_game(input_, output_, sess):
     board = Board()
-    play = MCTSPlayer(is_selfplay=True)
+    play = MCTSPlayer(sess, is_selfplay=True)
     z_temp = 1
     input_ = np.append(input_, np.zeros((42,)))
     output_t = np.array([])
@@ -333,7 +336,7 @@ def game_game(input_, output_):
         s = np.array(play.res_board[-1]) # state
         input_ = np.append(input_, s) 
 
-        #print(s)
+        print(s.reshape(6, 7))
         #print(pi)
         z_temp *= -1
     output_t = output_t.reshape(-1,8)
@@ -345,18 +348,43 @@ def game_game(input_, output_):
     return z_temp, input_, output_ 
     
 if __name__=="__main__":
-    start_time = time.time()
+#    start_time = time.time()
+
+    tf_x = tf.placeholder(tf.float32, [None, 42])
+    tf_y = tf.placeholder(tf.float32, [None, 8])
+    tf_pi, tf_z = tf.split(tf_y, [7,1], 1)
+    tf_image = tf.reshape(tf_x, [-1,6,7,1])
+    
+    num_of_kernel= 10
+    w_conv1 = tf.Variable( tf.truncated_normal( [3, 3, 1, num_of_kernel], stddev=0.1))
+    cov1 = tf.nn.conv2d(input=tf_image,
+                        filter = w_conv1,
+                        strides = [1, 1, 1,1],
+                        padding = "SAME",
+    )
+    b_conv1 = tf.Variable( tf.constant(0.1, shape=[10]))
+
+    cov1_rl = tf.nn.relu(cov1 + b_conv1)
+    pool1 = tf.nn.max_pool(cov1_rl,
+                           ksize = [1,2,2,1],
+                           strides = [1, 1 ,1,1],
+                           padding = "SAME")
+    #fully connected
+    result = tf.reshape(pool1,[-1,6*7*num_of_kernel])
+    tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
+    tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
+
+    sess = tf.Session()
+    saver = tf.train.Saver()
+    saver.restore(sess, "./tmp/model.ckpt")
+
     input_ = np.array([]) # input for DNN
     output_ = np.array([]) # answer for DNN
+    
     for _ in range(5):
-        z_temp, input_, output_= game_game(input_, output_)
+        z_temp, input_, output_= game_game(input_, output_, sess)
     input_ = input_.reshape(-1,42)
     output_ = output_.reshape(-1,8)
     
-    #print("input:",input_.shape)
-    #print("output:",output_)
- 
-    np.save("input",input_)  # input[:,# of move,:]
+    np.save("input", input_)  # input[:,# of move,:]
     np.save("output", output_) # output[# of move, :]
-    end_time = time.time()    
-    print(end_time - start_time)

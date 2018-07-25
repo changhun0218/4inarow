@@ -33,18 +33,19 @@ if __name__ == "__main__":
     cost_func = tf.nn.l2_loss(tf.subtract(tf_z, tf_v))
     loss = tf.reduce_mean(tf.add(cross_entropy, cost_func))
     train_step = tf.train.AdamOptimizer().minimize(loss)
-
+    
     sess = tf.InteractiveSession()
     sess.run(tf.global_variables_initializer())
+    saver = tf.train.Saver()
+    
     BatchSize = 50
     trainSplit = 0.9
     trainStep = 1
     input_ = np.load("input.npy")
     output = np.load("output.npy")
-    for _ in range(100):
+    for _ in range(1000):
         sess.run(train_step, feed_dict = { tf_x:input_ , tf_y: output})
-    print(sess.run(tf_y_pred, feed_dict = {tf_x:input_})[:,7])
-
-
-
-            
+    save_path = saver.save(sess, "./tmp/model.ckpt")
+    print("Model saved in path: %s" % save_path)
+#    print(sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x:input_}))#[:,7])
+#    print(sess.run(tf_v, feed_dict = {tf_x:input_}))#[:,7])
