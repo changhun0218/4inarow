@@ -24,7 +24,7 @@ if __name__ == "__main__":
                            padding = "SAME")
     #fully connected 
     result = tf.reshape(pool1,[-1,6*7*num_of_kernel])
-    tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
+    tf_y_pred = tf.contrib.layers.fully_connected(result, 8, activation_fn = None)
     print("\n\n\n\n")
     print(tf.shape(tf_y_pred))
     print("\n\n\n\n")
@@ -37,15 +37,16 @@ if __name__ == "__main__":
     sess = tf.InteractiveSession()
     sess.run(tf.global_variables_initializer())
     saver = tf.train.Saver()
+    saver.restore(sess, "./tmp/model.ckpt")
     
     BatchSize = 50
     trainSplit = 0.9
     trainStep = 1
     input_ = np.load("input.npy")
     output = np.load("output.npy")
-    for _ in range(1000):
+    for _ in range(100):
         sess.run(train_step, feed_dict = { tf_x:input_ , tf_y: output})
     save_path = saver.save(sess, "./tmp/model.ckpt")
     print("Model saved in path: %s" % save_path)
-#    print(sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x:input_}))#[:,7])
-#    print(sess.run(tf_v, feed_dict = {tf_x:input_}))#[:,7])
+    print(sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x:input_}))#[:,7])
+    print(sess.run(tf_v, feed_dict = {tf_x:input_}))#[:,7])

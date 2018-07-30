@@ -160,7 +160,7 @@ class TreeNode(object):
 class MCTS(object):
     """An implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, sess, c_puct=5, n_playout=2000):
+    def __init__(self, sess, c_puct=5, n_playout=500):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -177,7 +177,7 @@ class MCTS(object):
 
     def _policy(self, state):
         pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
-        p = pred[:7]
+        p = softmax(pred[:7])
         v = pred[7]
 #        v = np.random.rand()
 #        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
@@ -256,7 +256,7 @@ class MCTS(object):
 class MCTSPlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, sess, c_puct=5, n_playout=1000, is_selfplay=0):
+    def __init__(self, sess, c_puct=5, n_playout=500, is_selfplay=0):
         self.mcts = MCTS(sess, c_puct, n_playout)
         self._is_selfplay = is_selfplay
         self.res_board = []
@@ -278,8 +278,8 @@ class MCTSPlayer(object):
             # to choose only available moves
             array_available = np.zeros((7))
             array_available[sensible_moves] = 1
-            probs = probs * array_available
-            probs /= np.sum(probs)
+#            probs = probs * array_available
+#            probs /= np.sum(probs)
             move_probs[list(acts)] = probs # p(a)
             
             self.res_board.append(board.get_actual_board()) # store boards for learning
@@ -287,9 +287,13 @@ class MCTSPlayer(object):
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
+                explore_prob = 0.75 * probs + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs)))
+                explore_prob = explore_prob * array_available
+                explore_prob /= np.sum(explore_prob)
+                print(explore_prob)
                 move = np.random.choice(
                     acts,
-                    p=0.75*probs + 0.25*np.random.dirichlet(0.3*np.ones(len(probs)))
+                    p = explore_prob
                 )
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move, board)
@@ -337,7 +341,6 @@ def game_game(input_, output_, sess):
         s = np.array(play.res_board[-1]) # state
         input_ = np.append(input_, s) 
 
-        print(s.reshape(6, 7))
         #print(pi)
         z_temp *= -1
     output_t = output_t.reshape(-1,8)
