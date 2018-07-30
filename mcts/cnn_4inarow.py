@@ -2,32 +2,38 @@ import numpy as np
 import tensorflow as tf
 from mcts_4inarow import *
 
+def cnn_layer(x, kernel):
+    w_conv = tf.Variable(tf.truncated_normal(kernel, stddev=0.1))
+    conv = tf.nn.conv2d(input = x,
+                        filter = w_conv,
+                        strides = [1, 1, 1, 1],
+                        padding = "SAME"
+    )
+    b_conv = tf.Variable(tf.constant(0.1, shape=[kernel[3]]))
+
+    conv_rl = tf.nn.relu(conv + b_conv)
+    return conv_rl
+
+def generate_batch(input_, output, batch_size):
+    batch_indices = np.random.random_integers(0, len(input_) - 1, batch_size)
+    batch_features = input_[batch_indices]
+    batch_labels = output[batch_indices]
+    return (batch_features, batch_labels)
+
+
 if __name__ == "__main__":
     tf_x = tf.placeholder(tf.float32, [None, 42]) 
     tf_y = tf.placeholder(tf.float32, [None, 8])
-    tf_pi, tf_z = tf.split(tf_y, [7,1], 1)
-    tf_image = tf.reshape(tf_x, [-1,6,7,1])
+    tf_pi, tf_z = tf.split(tf_y, [7, 1], 1)
+    tf_image = tf.reshape(tf_x, [-1, 6, 7, 1])
 
-    num_of_kernel= 10
-    w_conv1 = tf.Variable( tf.truncated_normal( [3, 3, 1, num_of_kernel], stddev=0.1))
-    cov1 = tf.nn.conv2d(input=tf_image,
-                        filter = w_conv1,
-                        strides = [1, 1, 1,1],
-                        padding = "SAME",
-                        )
-    b_conv1 = tf.Variable( tf.constant(0.1, shape=[10]))
-
-    cov1_rl = tf.nn.relu(cov1 + b_conv1)
-    pool1 = tf.nn.max_pool(cov1_rl,
-                           ksize = [1,2,2,1],
-                           strides = [1, 1 ,1,1],
-                           padding = "SAME")
+    array_kernel = [[3, 3, 1, 32], [3, 3, 32, 64], [3, 3, 64, 1024]]
+    conv = tf_image
+    for kernel in array_kernel:
+        conv = cnn_layer(conv, kernel)
     #fully connected 
-    result = tf.reshape(pool1,[-1,6*7*num_of_kernel])
+    result = tf.reshape(conv ,[-1, 6 * 7 * 1024])
     tf_y_pred = tf.contrib.layers.fully_connected(result, 8, activation_fn = None)
-    print("\n\n\n\n")
-    print(tf.shape(tf_y_pred))
-    print("\n\n\n\n")
     tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=tf_p, labels=tf_pi )
     cost_func = tf.nn.l2_loss(tf.subtract(tf_z, tf_v))
@@ -39,13 +45,15 @@ if __name__ == "__main__":
     saver = tf.train.Saver()
     saver.restore(sess, "./tmp/model.ckpt")
     
-    BatchSize = 50
+    BatchSize = 10
     trainSplit = 0.9
     trainStep = 1
     input_ = np.load("input.npy")
     output = np.load("output.npy")
+    
     for _ in range(100):
-        sess.run(train_step, feed_dict = { tf_x:input_ , tf_y: output})
+        in_, out = generate_batch(input_, output, BatchSize)
+        sess.run(train_step, feed_dict = { tf_x: in_ , tf_y: out})
     save_path = saver.save(sess, "./tmp/model.ckpt")
     print("Model saved in path: %s" % save_path)
     print(sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x:input_}))#[:,7])

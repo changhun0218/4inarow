@@ -350,7 +350,20 @@ def game_game(input_, output_, sess):
         pass
     output_ = np.append(output_, output_t)
     return z_temp, input_, output_ 
-    
+
+def cnn_layer(x, kernel):
+    w_conv = tf.Variable(tf.truncated_normal(kernel, stddev=0.1))
+    conv = tf.nn.conv2d(input = x,
+                        filter = w_conv,
+                        strides = [1, 1, 1, 1],
+                        padding = "SAME"
+    )
+    b_conv = tf.Variable(tf.constant(0.1, shape=[kernel[3]]))
+
+    conv_rl = tf.nn.relu(conv + b_conv)
+    return conv_rl
+
+
 if __name__=="__main__":
 #    start_time = time.time()
 
@@ -359,22 +372,13 @@ if __name__=="__main__":
     tf_pi, tf_z = tf.split(tf_y, [7,1], 1)
     tf_image = tf.reshape(tf_x, [-1,6,7,1])
     
-    num_of_kernel= 10
-    w_conv1 = tf.Variable( tf.truncated_normal( [3, 3, 1, num_of_kernel], stddev=0.1))
-    cov1 = tf.nn.conv2d(input=tf_image,
-                        filter = w_conv1,
-                        strides = [1, 1, 1,1],
-                        padding = "SAME",
-    )
-    b_conv1 = tf.Variable( tf.constant(0.1, shape=[10]))
+    array_kernel = [[3, 3, 1, 32], [3, 3, 32, 64], [3, 3, 64, 1024]]
+    conv = tf_image
+    for kernel in array_kernel:
+        conv = cnn_layer(conv, kernel)
 
-    cov1_rl = tf.nn.relu(cov1 + b_conv1)
-    pool1 = tf.nn.max_pool(cov1_rl,
-                           ksize = [1,2,2,1],
-                           strides = [1, 1 ,1,1],
-                           padding = "SAME")
     #fully connected
-    result = tf.reshape(pool1,[-1,6*7*num_of_kernel])
+    result = tf.reshape(pool1,[-1,6*7*1024])
     tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
     tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
 
