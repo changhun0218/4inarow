@@ -378,7 +378,7 @@ if __name__=="__main__":
         conv = cnn_layer(conv, kernel)
 
     #fully connected
-    result = tf.reshape(pool1,[-1,6*7*1024])
+    result = tf.reshape(conv,[-1,6*7*1024])
     tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
     tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
 
@@ -386,13 +386,17 @@ if __name__=="__main__":
     saver = tf.train.Saver()
     saver.restore(sess, "./tmp/model.ckpt")
 
-    input_ = np.array([]) # input for DNN
-    output_ = np.array([]) # answer for DNN
+    input0 = np.load("input.npy") # input for DNN
+    output0 = np.load("output.npy") # answer for DNN
+    input_ = np.array([])
+    output_ = np.array([])
     
-    for _ in range(5):
+    for _ in range(1):
         z_temp, input_, output_= game_game(input_, output_, sess)
     input_ = input_.reshape(-1,42)
     output_ = output_.reshape(-1,8)
+    input0 = np.append(input0, input_).reshape(-1, 42)
+    output0 = np.append(output0, output_).reshape(-1, 8)
     
-    np.save("input", input_)  # input[:,# of move,:]
-    np.save("output", output_) # output[# of move, :]
+    np.save("input", input0)  # input[:,# of move,:]
+    np.save("output", output0) # output[# of move, :]
