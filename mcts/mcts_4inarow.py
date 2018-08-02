@@ -287,10 +287,10 @@ class MCTSPlayer(object):
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
-                explore_prob = 0.75 * probs + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs)))
+                explore_prob = 0.70 * probs + 0.30 * np.random.dirichlet(0.3 * np.ones(len(probs)))
                 explore_prob = explore_prob * array_available
                 explore_prob /= np.sum(explore_prob)
-                print(explore_prob)
+                print(explore_prob, -board.whose_turn)
                 move = np.random.choice(
                     acts,
                     p = explore_prob
@@ -380,7 +380,8 @@ if __name__=="__main__":
     #fully connected
     result = tf.reshape(conv,[-1,6*7*1024])
     tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
-    tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
+    tf_p, tf_v0 = tf.split(tf_y_pred, [7,1], 1)
+    tf_v = tf.tanh(tf_v0)
 
     sess = tf.Session()
     saver = tf.train.Saver()
@@ -391,7 +392,7 @@ if __name__=="__main__":
     input_ = np.array([])
     output_ = np.array([])
     
-    for _ in range(1):
+    for _ in range(10):
         z_temp, input_, output_= game_game(input_, output_, sess)
     input_ = input_.reshape(-1,42)
     output_ = output_.reshape(-1,8)

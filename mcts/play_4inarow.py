@@ -248,7 +248,7 @@ class MCTS(object):
 class MCTSPlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, sess, c_puct=5, n_playout=500, is_selfplay=0):
+    def __init__(self, sess, c_puct=5, n_playout=1000, is_selfplay=0):
         self.mcts = MCTS(sess, c_puct, n_playout)
         self._is_selfplay = is_selfplay
         self.res_board = []
@@ -293,6 +293,8 @@ class MCTSPlayer(object):
             else:
                 # with the default temp=1e-3, it is almost equivalent
                 # to choosing the move with the highest prob
+                probs = probs * array_available
+                probs /= np.sum(probs)
                 move = np.random.choice(acts, p=probs)
                 # reset the root node
                 self.mcts.update_with_move(move, board)
@@ -315,22 +317,23 @@ def game_game(sess):
     z_temp = 1
     
     for i in range(43):
-        move = play.get_action(board)
-        end, winner = board.game_end()
-        print(board.get_actual_board())
-
         my_move = int(input("Your turn:"))
         board.make_a_move(my_move)
         print(board.get_actual_board())
         end, winner = board.game_end()
-                        
-        # print("who's turn:",z_temp)
+
         if end or (i==42):
             #print("winner:", board.game_end()[1])
             #winner_arr = np.ones((len(play.res_board))) * winner
             #print(winner_arr)
             print("who wins?:", z_temp)
             break
+        
+        move = play.get_action(board)
+        end, winner = board.game_end()
+        print(board.get_actual_board())
+        
+        # print("who's turn:",z_temp)
 
 def cnn_layer(x, kernel):
     w_conv = tf.Variable(tf.truncated_normal(kernel, stddev=0.1))

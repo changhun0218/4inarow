@@ -34,7 +34,8 @@ if __name__ == "__main__":
     #fully connected 
     result = tf.reshape(conv ,[-1, 6 * 7 * 1024])
     tf_y_pred = tf.contrib.layers.fully_connected(result, 8, activation_fn = None)
-    tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
+    tf_p, tf_v0 = tf.split(tf_y_pred, [7,1], 1)
+    tf_v = tf.tanh(tf_v0)
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=tf_p, labels=tf_pi )
     cost_func = tf.nn.l2_loss(tf.subtract(tf_z, tf_v))
     loss = tf.reduce_mean(tf.add(cross_entropy, cost_func))
@@ -45,15 +46,15 @@ if __name__ == "__main__":
     saver = tf.train.Saver()
     saver.restore(sess, "./tmp/model.ckpt")
     
-    BatchSize = 10
+    BatchSize = 500
     trainSplit = 0.9
     trainStep = 1
     input_ = np.load("input.npy")
     output = np.load("output.npy")
-    
-    for _ in range(100):
+
+    for _ in range(1000):
         in_, out = generate_batch(input_, output, BatchSize)
-        sess.run(train_step, feed_dict = { tf_x: in_ , tf_y: out})
+        sess.run(train_step, feed_dict = {tf_x: in_, tf_y: out})
     save_path = saver.save(sess, "./tmp/model.ckpt")
     print("Model saved in path: %s" % save_path)
     print(sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x:input_}))#[:,7])
