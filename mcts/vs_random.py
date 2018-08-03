@@ -246,7 +246,7 @@ class MCTSPlayer(object):
     """AI player based on MCTS"""
 
     def __init__(self, sess, c_puct=5, n_playout=1000, is_selfplay=0):
-#        self.mcts = MCTS(sess, c_puct, n_playout)
+        self.mcts = MCTS(sess, c_puct, n_playout)
         self._is_selfplay = is_selfplay
         self.res_board = []
         self.res_probs = []
@@ -262,7 +262,6 @@ class MCTSPlayer(object):
 
     def get_action(self, board, temp=1e-1, return_prob=0):
         self.mcts = MCTS(self.sess, self.c_puct, self.n_playout)
-        print(self.mcts._policy(board))
         sensible_moves = board.availables
         #sensible_moves = np.arange(7)
         # the pi vector returned by MCTS as in the alphaGo Zero paper
@@ -270,10 +269,10 @@ class MCTSPlayer(object):
         if len(sensible_moves) > 0:
             acts, probs = self.mcts.get_move_probs(board, temp) # a, p_a
             sum_visit = 0
-            for i in range(7):
-                print(self.mcts._root._children[i]._n_visits)
-                sum_visit += self.mcts._root._children[i]._n_visits
-            print(sum_visit)
+            #for i in range(7):
+                #print(self.mcts._root._children[i]._n_visits)
+                #sum_visit += self.mcts._root._children[i]._n_visits
+            #print(sum_visit)
             # to choose only available moves
             array_available = np.zeros((7))
             array_available[sensible_moves] = 1
@@ -289,23 +288,23 @@ class MCTSPlayer(object):
                 explore_prob = 0.75 * probs + 0.25 * np.random.dirichlet(0.03 * np.ones(len(probs)))
                 explore_prob = explore_prob * array_available
                 explore_prob /= np.sum(explore_prob)
-                print(explore_prob)
+                #print(explore_prob)
                 move = np.random.choice(
                     acts,
                     p = explore_prob
                 )
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move, board)
-                print(board.get_actual_board())
+                #print(board.get_actual_board())
             else:
                 # with the default temp=1e-3, it is almost equivalent
                 # to choosing the move with the highest prob
                 probs = probs * array_available
-                print(array_available)
-                print(probs)
+                #print(array_available)
+                #print(probs)
                 probs /= np.sum(probs)
                 move = np.random.choice(acts, p=probs)
-                print(move)
+                #print(move)
                 # reset the root node
                 self.mcts.update_with_move(move, board)
                 #                location = board.move_to_location(move)
@@ -327,22 +326,22 @@ def game_game(sess):
     z_temp = 1
     
     for i in range(43):
-        my_move = int(input("Your turn:"))
+        my_move = np.random.randint(7)
+        #int(input("Your turn:"))
         board.make_a_move(my_move)
-        print(board.get_actual_board())
+        #print(board.get_actual_board())
         end, winner = board.game_end()
 
         if end or (i==42):
-            #print("winner:", board.game_end()[1])
-            #winner_arr = np.ones((len(play.res_board))) * winner
-            #print(winner_arr)
-            print("who wins?:", z_temp)
             break
         
         move = play.get_action(board)
         end, winner = board.game_end()
-        print(board.get_actual_board())
-        
+
+        if end or (i==42):
+            break
+
+    return winner
         # print("who's turn:",z_temp)
 
 def cnn_layer(x, kernel):
@@ -378,5 +377,15 @@ if __name__=="__main__":
     saver = tf.train.Saver()
     saver.restore(sess, "./tmp/model.ckpt")
 
-    while(1):
-        game_game(sess)
+    rand_win = 0
+    cnn_win = 0
+    for i in range(30):
+        winner = game_game(sess)
+        print(i, winner)
+        if winner == 1:
+            rand_win += 1
+        else:
+            cnn_win += 1
+        print("random_win: ", rand_win)
+        print("cnn_win: ", cnn_win)
+        print("win_rate: ", cnn_win / (rand_win + cnn_win))

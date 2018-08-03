@@ -178,7 +178,7 @@ class MCTS(object):
     def _policy(self, state):
         pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
         p = softmax(pred[:7])
-        v = pred[7]
+        v = np.tanh(pred[7])
 #        v = np.random.rand()
 #        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return p, v
@@ -203,21 +203,22 @@ class MCTS(object):
         # for the current player.
         action_probs, leaf_value = self._policy(state)
         if not end:
+            array_available = np.zeros((7))
+            array_available[state.availables] = 1
+            action_probs = action_probs * array_available
+            action_probs /= np.sum(action_probs)
             node.expand(action_probs)
-
         else:
             # for end state，return the "true" leaf_value
-            if winner == -1:  # tie
+            if winner == 0:  # tie
                 leaf_value = 0.0
             else:
-                leaf_value = (
-                    1.0 if winner == state.get_current_player() else -1.0
-                )
+                leaf_value = winner
 
         # Update value and visit count of nodes in this traversal.
         node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, state, temp=1e-3):
+    def get_move_probs(self, state, temp=0.9):
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
         state: the current game state
@@ -261,6 +262,9 @@ class MCTSPlayer(object):
         self._is_selfplay = is_selfplay
         self.res_board = []
         self.res_probs = []
+        self.c_puct = c_puct
+        self.n_playout = n_playout
+        self.sess = sess
 
     def set_player_ind(self, p):
         self.player = p
@@ -268,7 +272,8 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, board, temp=1.0, return_prob=0):
+    def get_action(self, board, temp=0.9, return_prob=0):
+        self.mcts = MCTS(self.sess, self.c_puct, self.n_playout)
         sensible_moves = board.availables
         #sensible_moves = np.arange(7)
         # the pi vector returned by MCTS as in the alphaGo Zero paper
@@ -287,7 +292,7 @@ class MCTSPlayer(object):
             if self._is_selfplay:
                 # add Dirichlet Noise for exploration (needed for
                 # self-play training)
-                explore_prob = 0.70 * probs + 0.30 * np.random.dirichlet(0.3 * np.ones(len(probs)))
+                explore_prob = 0.75 * probs + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs)))
                 explore_prob = explore_prob * array_available
                 explore_prob /= np.sum(explore_prob)
                 print(explore_prob, -board.whose_turn)
@@ -392,7 +397,7 @@ if __name__=="__main__":
     input_ = np.array([])
     output_ = np.array([])
     
-    for _ in range(10):
+    for _ in range(200):
         z_temp, input_, output_= game_game(input_, output_, sess)
     input_ = input_.reshape(-1,42)
     output_ = output_.reshape(-1,8)

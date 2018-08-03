@@ -46,16 +46,16 @@ if __name__ == "__main__":
     saver = tf.train.Saver()
     saver.restore(sess, "./tmp/model.ckpt")
     
-    BatchSize = 500
+    BatchSize = 50
     trainSplit = 0.9
     trainStep = 1
     input_ = np.load("input.npy")
     output = np.load("output.npy")
 
-    for _ in range(1000):
+    for _ in range(100):
         in_, out = generate_batch(input_, output, BatchSize)
         sess.run(train_step, feed_dict = {tf_x: in_, tf_y: out})
     save_path = saver.save(sess, "./tmp/model.ckpt")
     print("Model saved in path: %s" % save_path)
     print(sess.run(tf.nn.softmax(tf_p), feed_dict = {tf_x:input_}))#[:,7])
-    print(sess.run(tf_v, feed_dict = {tf_x:input_}))#[:,7])
+    print(sess.run(tf_v, feed_dict = {tf_x:input_[-50:]}))#[:,7])
