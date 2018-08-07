@@ -218,7 +218,7 @@ class MCTS(object):
         # Update value and visit count of nodes in this traversal.
         node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, state, temp=0.9):
+    def get_move_probs(self, state, temp=0.8):
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
         state: the current game state
@@ -272,7 +272,7 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, board, temp=0.9, return_prob=0):
+    def get_action(self, board, temp=0.8, return_prob=0):
         self.mcts = MCTS(self.sess, self.c_puct, self.n_playout)
         sensible_moves = board.availables
         #sensible_moves = np.arange(7)
@@ -330,7 +330,11 @@ def game_game(input_, output_, sess):
     output_t = np.array([])
     
     for i in range(43):
-        move = play.get_action(board)
+        if i <= 10:
+            temp = 1
+        else:
+            temp = 0.1
+        move = play.get_action(board, temp)
         end, winner = board.game_end()
         piv = np.append(play.res_probs[-1], z_temp) # pi, v: pi which is prob of a
         output_t = np.append(output_t, piv)

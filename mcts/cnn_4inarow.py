@@ -49,10 +49,10 @@ if __name__ == "__main__":
     BatchSize = 50
     trainSplit = 0.9
     trainStep = 1
-    input_ = np.load("input.npy")
-    output = np.load("output.npy")
+    input_ = np.load("input.npy")[-20000:]
+    output = np.load("output.npy")[-20000:]
 
-    for _ in range(100):
+    for _ in range(1000):
         in_, out = generate_batch(input_, output, BatchSize)
         sess.run(train_step, feed_dict = {tf_x: in_, tf_y: out})
     save_path = saver.save(sess, "./tmp/model.ckpt")
