@@ -91,6 +91,7 @@ class TreeNode(object):
         self._children = {}  # a map from action to TreeNode
         self._n_visits = 0
         self._Q = 0
+        self._W = 0
         self._u = 0
         self._P = prior_p
 
@@ -119,8 +120,9 @@ class TreeNode(object):
         """
         # Count visit.
         self._n_visits += 1
+        self._W += leaf_value
         # Update Q, a running average of values for all visits.
-        self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        self._Q = self._W / self._n_visits
 
     def update_recursive(self, leaf_value):
         """Like a call to update(), but applied recursively for all ancestors.
@@ -152,7 +154,7 @@ class TreeNode(object):
 class MCTS(object):
     """An implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, sess, c_puct=5, n_playout=500):
+    def __init__(self, sess, c_puct=10, n_playout=500):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -163,20 +165,22 @@ class MCTS(object):
             relying on the prior more.
         """
         self._root = TreeNode(None, 1.0)
-        #self._policy = policy_value_fn
         self._c_puct = c_puct
         self._n_playout = n_playout
 
     def _policy(self, state):
-        pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
-        p = softmax(pred[:7])
-        v = np.tanh(pred[7])
-#        v = np.random.rand()
-#        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
-        return p, v
-                    
+        if state.whose_turn == 1:
+            pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
+            p = softmax(pred[:7])
+            v = np.tanh(pred[7])
+            return p, v
+
+        if state.whose_turn == -1:
+            p = np.ones(7) / 7
+            v = 0
+            return p, v
         
-    def _playout(self, state):
+    def _playout(self, state, whose_turn):
         """Run a single playout from the root to the leaf, getting a value at
         the leaf and propagating it back through its parents.
         State is modified in-place, so a copy must be provided.
@@ -206,9 +210,10 @@ class MCTS(object):
                 leaf_value = 0.0
             else:
                 leaf_value = winner
-        # Update value and visit count of nodes in this traversal.
-        node.update_recursive(-leaf_value)
+        # Update value and visit co
+        node.update_recursive(whose_turn * leaf_value)
 
+        
     def get_move_probs(self, state, temp=1e-1):
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
@@ -217,7 +222,7 @@ class MCTS(object):
         """
         for n in range(self._n_playout):
             state_copy = copy.deepcopy(state)
-            self._playout(state_copy)
+            self._playout(state_copy, state_copy.whose_turn)
 
         # calc the move probabilities based on visit counts at the root node
         act_visits = [(act, node._n_visits)
@@ -245,7 +250,7 @@ class MCTS(object):
 class MCTSPlayer(object):
     """AI player based on MCTS"""
 
-    def __init__(self, sess, c_puct=5, n_playout=1000, is_selfplay=0):
+    def __init__(self, sess, c_puct=10, n_playout=500, is_selfplay=0):
         self.mcts = MCTS(sess, c_puct, n_playout)
         self._is_selfplay = is_selfplay
         self.res_board = []
@@ -322,20 +327,21 @@ class MCTSPlayer(object):
 
 def game_game(sess):
     board = Board()
-    play = MCTSPlayer(sess, is_selfplay=False)
+    play1 = MCTSPlayer(sess, is_selfplay=False)
+    play2 = MCTSPlayer(sess, is_selfplay=False)
     z_temp = 1
     
     for i in range(43):
-        my_move = np.random.randint(7)
+        my_move = play1.get_action(board)
         #int(input("Your turn:"))
-        board.make_a_move(my_move)
-        #print(board.get_actual_board())
+        print(board.get_actual_board())
         end, winner = board.game_end()
 
         if end or (i==42):
             break
         
-        move = play.get_action(board)
+        move = play2.get_action(board)
+        print(board.get_actual_board())
         end, winner = board.game_end()
 
         if end or (i==42):
@@ -382,7 +388,7 @@ if __name__=="__main__":
     for i in range(30):
         winner = game_game(sess)
         print(i, winner)
-        if winner == 1:
+        if winner == -1:
             rand_win += 1
         else:
             cnn_win += 1

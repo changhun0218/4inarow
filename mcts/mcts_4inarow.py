@@ -99,6 +99,7 @@ class TreeNode(object):
         self._children = {}  # a map from action to TreeNode
         self._n_visits = 0
         self._Q = 0
+        self._W = 0
         self._u = 0
         self._P = prior_p
 
@@ -127,8 +128,9 @@ class TreeNode(object):
         """
         # Count visit.
         self._n_visits += 1
+        self._W += leaf_value
         # Update Q, a running average of values for all visits.
-        self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        self._Q = self._W / self._n_visits
 
     def update_recursive(self, leaf_value):
         """Like a call to update(), but applied recursively for all ancestors.
@@ -171,7 +173,6 @@ class MCTS(object):
             relying on the prior more.
         """
         self._root = TreeNode(None, 1.0)
-        #self._policy = policy_value_fn
         self._c_puct = c_puct
         self._n_playout = n_playout
 
@@ -179,8 +180,6 @@ class MCTS(object):
         pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
         p = softmax(pred[:7])
         v = np.tanh(pred[7])
-#        v = np.random.rand()
-#        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return p, v
                     
         
@@ -201,24 +200,26 @@ class MCTS(object):
         # Evaluate the leaf using a network which outputs a list of
         # (action, probability) tuples p and also a score v in [-1, 1]
         # for the current player.
-        action_probs, leaf_value = self._policy(state)
         if not end:
+            action_probs, leaf_value = self._policy(state)
+            node.update_recursive(leaf_value)
             array_available = np.zeros((7))
             array_available[state.availables] = 1
             action_probs = action_probs * array_available
             action_probs /= np.sum(action_probs)
             node.expand(action_probs)
         else:
-            # for end state，return the "true" leaf_value
+            # for end state return the "true" leaf_value
             if winner == 0:  # tie
                 leaf_value = 0.0
             else:
                 leaf_value = winner
-
+            node.update_recursive(1)
+                
         # Update value and visit count of nodes in this traversal.
-        node.update_recursive(-leaf_value)
 
-    def get_move_probs(self, state, temp=0.8):
+
+    def get_move_probs(self, state, temp=1.0):
         """Run all playouts sequentially and return the available actions and
         their corresponding probabilities.
         state: the current game state
@@ -272,7 +273,7 @@ class MCTSPlayer(object):
     def reset_player(self):
         self.mcts.update_with_move(-1)
 
-    def get_action(self, board, temp=0.8, return_prob=0):
+    def get_action(self, board, temp=1.0, return_prob=0):
         self.mcts = MCTS(self.sess, self.c_puct, self.n_playout)
         sensible_moves = board.availables
         #sensible_moves = np.arange(7)
@@ -295,14 +296,14 @@ class MCTSPlayer(object):
                 explore_prob = 0.75 * probs + 0.25 * np.random.dirichlet(0.3 * np.ones(len(probs)))
                 explore_prob = explore_prob * array_available
                 explore_prob /= np.sum(explore_prob)
-                print(explore_prob, -board.whose_turn)
+#                print(explore_prob, -board.whose_turn)
                 move = np.random.choice(
                     acts,
                     p = explore_prob
                 )
                 # update the root node and reuse the search tree
                 self.mcts.update_with_move(move, board)
-                print(board.get_actual_board())
+#                print(board.get_actual_board())
             else:
                 # with the default temp=1e-3, it is almost equivalent
                 # to choosing the move with the highest prob
@@ -344,7 +345,9 @@ def game_game(input_, output_, sess):
             #print("winner:", board.game_end()[1])
             #winner_arr = np.ones((len(play.res_board))) * winner
             #print(winner_arr)
-            print("who wins?:", z_temp)
+            if winner == None:
+                winner = 0
+#            print("who wins?:", winner)
             break
 
         s = np.array(play.res_board[-1]) # state
@@ -353,10 +356,7 @@ def game_game(input_, output_, sess):
         #print(pi)
         z_temp *= -1
     output_t = output_t.reshape(-1,8)
-    if z_temp == -1:    # if -1 wins, revert the 'v'
-        output_t[:,7] *= -1
-    else:
-        pass
+    output_t[:, 7] = output_t[:, 7] * winner # if -1 wins, revert the 'v'
     output_ = np.append(output_, output_t)
     return z_temp, input_, output_ 
 
@@ -388,7 +388,7 @@ if __name__=="__main__":
 
     #fully connected
     result = tf.reshape(conv,[-1,6*7*1024])
-    tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
+    tf_y_pred = tf.contrib.layers.fully_connected(result, 8, activation_fn = None)
     tf_p, tf_v0 = tf.split(tf_y_pred, [7,1], 1)
     tf_v = tf.tanh(tf_v0)
 
@@ -401,7 +401,7 @@ if __name__=="__main__":
     input_ = np.array([])
     output_ = np.array([])
     
-    for _ in range(200):
+    for _ in range(100):
         z_temp, input_, output_= game_game(input_, output_, sess)
     input_ = input_.reshape(-1,42)
     output_ = output_.reshape(-1,8)

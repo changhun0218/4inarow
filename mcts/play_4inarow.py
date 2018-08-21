@@ -92,6 +92,7 @@ class TreeNode(object):
         self._n_visits = 0
         self._Q = 0
         self._u = 0
+        self._W = 0
         self._P = prior_p
 
     def expand(self, action_priors):
@@ -119,8 +120,9 @@ class TreeNode(object):
         """
         # Count visit.
         self._n_visits += 1
+        self._W += leaf_value
         # Update Q, a running average of values for all visits.
-        self._Q += 1.0*(leaf_value - self._Q) / self._n_visits
+        self._Q = self._W / self._n_visits
 
     def update_recursive(self, leaf_value):
         """Like a call to update(), but applied recursively for all ancestors.
@@ -152,7 +154,7 @@ class TreeNode(object):
 class MCTS(object):
     """An implementation of Monte Carlo Tree Search."""
 
-    def __init__(self, sess, c_puct=5, n_playout=500):
+    def __init__(self, sess, c_puct=5, n_playout=1000):
         """
         policy_value_fn: a function that takes in a board state and outputs
             a list of (action, probability) tuples and also a score in [-1, 1]
@@ -171,8 +173,6 @@ class MCTS(object):
         pred = sess.run(tf_y_pred, feed_dict = {tf_x: state.get_actual_board().reshape(1, -1)}).reshape(-1)
         p = softmax(pred[:7])
         v = np.tanh(pred[7])
-#        v = np.random.rand()
-#        p = np.random.dirichlet([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         return p, v
                     
         
@@ -207,7 +207,7 @@ class MCTS(object):
             else:
                 leaf_value = winner
         # Update value and visit count of nodes in this traversal.
-        node.update_recursive(-leaf_value)
+        node.update_recursive(1)
 
     def get_move_probs(self, state, temp=1e-1):
         """Run all playouts sequentially and return the available actions and
@@ -326,7 +326,7 @@ def game_game(sess):
     play = MCTSPlayer(sess, is_selfplay=False)
     z_temp = 1
     
-    for i in range(43):
+    for i in range(43):       
         my_move = int(input("Your turn:"))
         board.make_a_move(my_move)
         print(board.get_actual_board())
@@ -336,12 +336,21 @@ def game_game(sess):
             #print("winner:", board.game_end()[1])
             #winner_arr = np.ones((len(play.res_board))) * winner
             #print(winner_arr)
-            print("who wins?:", z_temp)
+            print("who wins?:", winner)
             break
         
         move = play.get_action(board)
         end, winner = board.game_end()
         print(board.get_actual_board())
+
+        if end or (i==42):
+            #print("winner:", board.game_end()[1])
+            #winner_arr = np.ones((len(play.res_board))) * winner
+            #print(winner_arr)
+            print("who wins?:", winner)
+            break
+
+        
         
         # print("who's turn:",z_temp)
 
@@ -371,7 +380,7 @@ if __name__=="__main__":
 
     #fully connected
     result = tf.reshape(conv,[-1,6*7*1024])
-    tf_y_pred = tf.contrib.layers.fully_connected(result, 8)
+    tf_y_pred = tf.contrib.layers.fully_connected(result, 8, activation_fn = None)
     tf_p, tf_v = tf.split(tf_y_pred, [7,1], 1)
 
     sess = tf.Session()
